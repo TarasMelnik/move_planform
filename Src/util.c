@@ -696,7 +696,7 @@ void standstillHold(void) {
  * This is useful when a small amount of motor braking is desired instead of "freewheel".
  * 
  * Input: speedBlend = fixdt(0,16,15), reverseDir = {0, 1}
- * Output: input2.cmd (Throtle) with brake component included
+ * Output: input2.cmd (Throttle) with brake component included
  */
 void electricBrake(uint16_t speedBlend, uint8_t reverseDir) {
   #if defined(ELECTRIC_BRAKE_ENABLE) && (CTRL_TYP_SEL == FOC_CTRL) && (CTRL_MOD_REQ == TRQ_MODE)
