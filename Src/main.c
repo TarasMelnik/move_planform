@@ -555,21 +555,21 @@ int main(void) {
     } else if (rtY_Left.z_errCode || rtY_Right.z_errCode) {                                           // 1 beep (low pitch): Motor error, disable motors
       enable = 0;
       beepCount(1, 24, 1);
-    } else if (timeoutFlgADC) {                                                                       // 2 beeps (low pitch): ADC timeout
-      beepCount(2, 24, 1);
-    } else if (timeoutFlgSerial) {                                                                    // 3 beeps (low pitch): Serial timeout
-      beepCount(3, 24, 1);
-    } else if (timeoutFlgGen) {                                                                       // 4 beeps (low pitch): General timeout (PPM, PWM, Nunchuk)
-      beepCount(4, 24, 1);
-    } else if (TEMP_WARNING_ENABLE && board_temp_deg_c >= TEMP_WARNING) {                             // 5 beeps (low pitch): Mainboard temperature warning
-      beepCount(5, 24, 1);
-    } else if (BAT_LVL1_ENABLE && batVoltage < BAT_LVL1) {                                            // 1 beep fast (medium pitch): Low bat 1
-      beepCount(0, 10, 6);
+    // } else if (timeoutFlgADC) {                                                                       // 2 beeps (low pitch): ADC timeout
+    //   beepCount(2, 24, 1);
+    // } else if (timeoutFlgSerial) {                                                                    // 3 beeps (low pitch): Serial timeout
+    //   beepCount(3, 24, 1);
+    // } else if (timeoutFlgGen) {                                                                       // 4 beeps (low pitch): General timeout (PPM, PWM, Nunchuk)
+    //   beepCount(4, 24, 1);
+    // } else if (TEMP_WARNING_ENABLE && board_temp_deg_c >= TEMP_WARNING) {                             // 5 beeps (low pitch): Mainboard temperature warning
+    //   beepCount(5, 24, 1);
+    // } else if (BAT_LVL1_ENABLE && batVoltage < BAT_LVL1) {                                            // 1 beep fast (medium pitch): Low bat 1
+    //   beepCount(0, 10, 6);
     } else if (BAT_LVL2_ENABLE && batVoltage < BAT_LVL2) {                                            // 1 beep slow (medium pitch): Low bat 2
       beepCount(0, 10, 30);
     } else if (BEEPS_BACKWARD && (((cmdR < -50 || cmdL < -50) && speedAvg < 0) || MultipleTapBrake.b_multipleTap)) { // 1 beep fast (high pitch): Backward spinning motors
-      beepCount(0, 5, 1);
-      backwardDrive = 1;
+     //// beepCount(0, 5, 1);
+      backwardDrive = 1; // val use for LED indication
     } else {  // do not beep
       beepCount(0, 0, 0);
       backwardDrive = 0;
