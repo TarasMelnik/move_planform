@@ -248,7 +248,7 @@ int main(void) {
     }
   #endif
   
-  #ifndef VARIANT_PWM
+  #ifdef VARIANT_PWM
     enable = 0;
   #endif
 
@@ -257,34 +257,21 @@ int main(void) {
 
     readCommand();                        // Read Command: input1[inIdx].cmd, input2[inIdx].cmd
     calcAvgSpeed();                       // Calculate average measured speed: speedAvg, speedAvgAbs
-    
-    #ifndef VARIANT_PWM
-        // ####### MOTOR ENABLING: Only if the initial input is very small (for SAFETY) #######
+
+    #ifndef VARIANT_TRANSPOTTER
+      // ####### MOTOR ENABLING: Only if the initial input is very small (for SAFETY) #######
+      if(ABS(input1[inIdx].cmd) > 20 || ABS(input2[inIdx].cmd) > 20) { // controlle or resiver need time for connect
         if (enable == 0 && !rtY_Left.z_errCode && !rtY_Right.z_errCode && 
             ABS(input1[inIdx].cmd) < 50 && ABS(input2[inIdx].cmd) < 50){
             beepShort(6);                     // make 2 beeps indicating the motor enable
             beepShort(4); HAL_Delay(100);
             steerFixdt = speedFixdt = 0;      // reset filters
             enable = 1;                       // enable motors
-        #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
+            #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
             printf("-- Motors enabled --\r\n");
-        #endif
+            #endif
         }
-    #endif
-
-    #ifndef VARIANT_TRANSPOTTER
-      // ####### MOTOR ENABLING: Only if the initial input is very small (for SAFETY) #######
-      if (enable == 0 && !rtY_Left.z_errCode && !rtY_Right.z_errCode && 
-          ABS(input1[inIdx].cmd) < 50 && ABS(input2[inIdx].cmd) < 50){
-        beepShort(6);                     // make 2 beeps indicating the motor enable
-        beepShort(4); HAL_Delay(100);
-        steerFixdt = speedFixdt = 0;      // reset filters
-        enable = 1;                       // enable motors
-        #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
-        printf("-- Motors enabled --\r\n");
-        #endif
       }
-
       // ####### VARIANT_HOVERCAR #######
       #if defined(VARIANT_HOVERCAR) || defined(VARIANT_SKATEBOARD) || defined(ELECTRIC_BRAKE_ENABLE)
         uint16_t speedBlend;                                        // Calculate speed Blend, a number between [0, 1] in fixdt(0,16,15)
