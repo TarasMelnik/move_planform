@@ -30,6 +30,7 @@
 #include "BLDC_controller.h"      /* BLDC's header file */
 #include "rtwtypes.h"
 #include "comms.h"
+#include "bldc.h"
 
 #if defined(DEBUG_I2C_LCD) || defined(SUPPORT_LCD)
 #include "hd44780.h"
@@ -80,7 +81,9 @@ extern uint8_t timeoutFlgSerial;        // Timeout Flag for Rx Serial command: 0
 extern volatile int pwml;               // global variable for pwm left. -1000 to 1000
 extern volatile int pwmr;               // global variable for pwm right. -1000 to 1000
 
-extern uint8_t enable;                  // global variable for motor enable
+//extern uint8_t enable;                  // global variable for motor enable
+extern uint8_t enable_l;                  // global variable for motor enable
+extern uint8_t enable_r;                  // global variable for motor enable
 
 extern int16_t batVoltage;              // global variable for battery voltage
 
@@ -150,6 +153,14 @@ static uint8_t sideboard_leds_R;
 #endif
 
 static int16_t    speed;                // local variable for speed. -1000 to 1000
+
+#define DELAY_MOT_ENABLE 5000
+#define ERROR_RST_MOT_CNT 50
+static uint32_t timer_mot_enbl;                  // timer for enable motor
+static uint8_t restart_mot = 0;
+static uint8_t error_rst_mot_l = 0;
+static uint8_t error_rst_mot_r = 0;
+
 #ifndef VARIANT_TRANSPOTTER
   static int16_t  steer;                // local variable for steering. -1000 to 1000
   static int16_t  steerRateFixdt;       // local fixed-point variable for steering rate limiter
@@ -249,7 +260,9 @@ int main(void) {
   #endif
   
   #ifdef VARIANT_PWM
-    enable = 0;
+    //enable = 0;
+    enable_l = 0;
+    enable_r = 0;
   #endif
 
   while(1) {
@@ -261,17 +274,19 @@ int main(void) {
     #ifndef VARIANT_TRANSPOTTER
       // ####### MOTOR ENABLING: Only if the initial input is very small (for SAFETY) #######
       if(ABS(input1[inIdx].cmd) > 20 || ABS(input2[inIdx].cmd) > 20) { // controlle or resiver need time for connect
-        if (enable == 0 && !rtY_Left.z_errCode && !rtY_Right.z_errCode && 
+        if (enable_l == 0 && enable_r == 0 && !rtY_Left.z_errCode && !rtY_Right.z_errCode && 
             ABS(input1[inIdx].cmd) < 50 && ABS(input2[inIdx].cmd) < 50){
             beepShort(6);                     // make 2 beeps indicating the motor enable
             beepShort(4); HAL_Delay(100);
             steerFixdt = speedFixdt = 0;      // reset filters
-            enable = 1;                       // enable motors
+            //enable = 1;                       // enable motors
+            enable_l = 1;                       // enable motors
+            enable_r = 1;                       // enable motors
             #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
             printf("-- Motors enabled --\r\n");
             #endif
         }
-      }
+      } 
       // ####### VARIANT_HOVERCAR #######
       #if defined(VARIANT_HOVERCAR) || defined(VARIANT_SKATEBOARD) || defined(ELECTRIC_BRAKE_ENABLE)
         uint16_t speedBlend;                                        // Calculate speed Blend, a number between [0, 1] in fixdt(0,16,15)
@@ -545,9 +560,55 @@ int main(void) {
 
     // ####### POWEROFF BY POWER-BUTTON #######
    poweroffPressCheck();
+    
+    // ####### Change power if battery critical low ######## 
+    // static uint8_t change_max_power = 0;
+    if (BAT_DEAD_LOW_SPEED && batVoltage < BAT_LVL1 ){
+        #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
+            printf("Powering set to low\r\n");
+        #endif
+        //if(change_max_power == 0){
+            // change_max_power = 100;
+            input1[inIdx].max = 430;
+            input1[inIdx].min = -430;
+            input2[inIdx].max = 430;
+            input2[inIdx].min = -430;
+        
+        //}
+    } else if (BAT_DEAD_LOW_SPEED && batVoltage < BAT_LVL2 ){
+        #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
+            printf("Powering set to low\r\n");
+        #endif
+        //if(change_max_power == 0){
+            // change_max_power = 100;
+            input1[inIdx].max = 650;
+            input1[inIdx].min = -650;
+            input2[inIdx].max = 650;
+            input2[inIdx].min = -650;
+        
+        //}
+    } 
+    // else if(change_max_power > 0){
+    //     InputStruct tmp_input1 = {0, 0, 0, PRI_INPUT1};
+    //     InputStruct tmp_input2 = {0, 0, 0, PRI_INPUT2};
+
+    //     if(input1[inIdx].max   < tmp_input1.max) {
+    //         input1[inIdx].max += 1; // ~25 sec to 100% power
+    //         input1[inIdx].min -= 1;
+    //         input2[inIdx].max += 1;
+    //         input2[inIdx].min -= 1;
+    //     } else {
+    //         input1[inIdx].max = tmp_input1.max;
+    //         input1[inIdx].min = tmp_input1.min;
+    //         input2[inIdx].max = tmp_input2.max;
+    //         input2[inIdx].min = tmp_input2.min;
+    //         change_max_power = 0;
+    //     }
+        
+    // }  
 
     // ####### BEEP AND EMERGENCY POWEROFF #######
-    if (TEMP_POWEROFF_ENABLE && board_temp_deg_c >= TEMP_POWEROFF && speedAvgAbs < 20){  // poweroff before mainboard burns OR low bat 3
+    if (TEMP_POWEROFF_ENABLE && board_temp_deg_c >= TEMP_POWEROFF && speedAvgAbs < 10){  // poweroff before mainboard burns OR low bat 3
       #if defined(DEBUG_SERIAL_USART2) || defined(DEBUG_SERIAL_USART3)
         printf("Powering off, temperature is too high\r\n");
       #endif
@@ -558,9 +619,25 @@ int main(void) {
         printf("Powering off, battery voltage is too low\r\n");
       #endif
       poweroff();
-    } else if (rtY_Left.z_errCode || rtY_Right.z_errCode) {                                           // 1 beep (low pitch): Motor error, disable motors
-      enable = 0;
-      beepCount(1, 24, 1);
+    } else if (rtY_Left.z_errCode) {                                           // 1 beep (low pitch): Motor error, disable motors
+      if(enable_l > 0){
+          enable_l = 0;
+          rtY_Left.z_errCode = 0;
+          BLDC_clear_error_l();
+
+          beepCount(1, 24, 1);
+          restart_mot = 1;
+          timer_mot_enbl = HAL_GetTick();
+      }
+    } else if (rtY_Right.z_errCode) {                                           // 1 beep (low pitch): Motor error, disable motors
+        if(enable_r > 0){
+            enable_r = 0;
+            rtY_Right.z_errCode = 0;
+            BLDC_clear_error_r();
+            beepCount(1, 24, 1);
+            restart_mot = 1;
+            timer_mot_enbl = HAL_GetTick();
+        }
     // } else if (timeoutFlgADC) {                                                                       // 2 beeps (low pitch): ADC timeout
     //   beepCount(2, 24, 1);
     // } else if (timeoutFlgSerial) {                                                                    // 3 beeps (low pitch): Serial timeout
@@ -581,6 +658,27 @@ int main(void) {
       backwardDrive = 0;
     }
 
+    if(restart_mot){
+        if(HAL_GetTick() - timer_mot_enbl > DELAY_MOT_ENABLE){
+            timer_mot_enbl = HAL_GetTick();
+            if(enable_l == 0){
+                if(error_rst_mot_l < ERROR_RST_MOT_CNT){
+                    error_rst_mot_l += 1;
+                    enable_l = 1;
+                    if(enable_r != 0) restart_mot = 0;
+                }
+            }
+            if(enable_r == 0){
+                if(error_rst_mot_r < ERROR_RST_MOT_CNT){
+                    error_rst_mot_r += 1;
+                    enable_r = 1;
+                    if(enable_l != 0) restart_mot = 0;
+                }
+            }
+           
+
+        }
+    }
 
     inactivity_timeout_counter++;
 
@@ -658,4 +756,6 @@ void SystemClock_Config(void) {
 
   /* SysTick_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+
+  //__HAL_AFIO_REMAP_SWJ_ENABLE();
 }

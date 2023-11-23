@@ -399,7 +399,7 @@ void MX_GPIO_Init(void) {
   
 
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-
+  //GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Pin = BUTTON_PIN;
   HAL_GPIO_Init(BUTTON_PORT, &GPIO_InitStruct);
 
